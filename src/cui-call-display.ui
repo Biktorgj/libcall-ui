@@ -21,6 +21,18 @@
         <property name="orientation">vertical</property>
         <property name="spacing">24</property>
         <child>
+          <object class="GtkLabel" id="incoming_phone_call">
+            <property name="visible">False</property>
+            <property name="margin-top">12</property>
+            <property name="margin-bottom">12</property>
+            <property name="label" translatable="yes">Incoming phone call</property>
+            <property name="ellipsize">middle</property>
+            <style>
+              <class name="dim-label"/>
+            </style>
+          </object>
+        </child>
+        <child>
           <object class="GtkBox" id="call_info">
             <property name="visible">True</property>
             <property name="hexpand">True</property>
@@ -148,21 +160,20 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkButton" id="add_call">
+                  <object class="GtkToggleButton" id="bluetooth">
                     <property name="width-request">72</property>
                     <property name="height-request">72</property>
                     <property name="visible">True</property>
-                    <property name="sensitive">False</property>
                     <property name="receives-default">False</property>
                     <property name="halign">center</property>
                     <property name="valign">start</property>
-                    <signal name="clicked" handler="add_call_clicked_cb" swapped="no"/>
+                    <signal name="toggled" handler="bluetooth_audio_toggled_cb" swapped="no"/>
                     <child>
                       <object class="GtkImage">
                         <property name="visible">True</property>
                         <property name="vexpand">True</property>
                         <property name="pixel-size">32</property>
-                        <property name="icon-name">list-add-symbolic</property>
+                        <property name="icon-name">bluetooth-active-symbolic</property>
                       </object>
                     </child>
                     <style>
@@ -206,12 +217,12 @@
                     <property name="top-attach">1</property>
                   </packing>
                 </child>
-                <child>
+                 <child>
                   <object class="GtkLabel">
                     <property name="visible">True</property>
                     <property name="valign">start</property>
                     <property name="vexpand">True</property>
-                    <property name="label" translatable="yes">Add call</property>
+                    <property name="label" translatable="yes">Bluetooth</property>
                     <property name="justify">center</property>
                     <property name="wrap">True</property>
                     <property name="wrap-mode">word-char</property>
@@ -229,6 +240,49 @@
                 <property name="visible">True</property>
                 <property name="row-spacing">6</property>
                 <property name="column-homogeneous">True</property>
+                                 <child>
+                  <object class="GtkButton" id="add_call">
+                    <property name="width-request">72</property>
+                    <property name="height-request">72</property>
+                    <property name="visible">True</property>
+                    <property name="sensitive">False</property>
+                    <property name="receives-default">False</property>
+                    <property name="halign">center</property>
+                    <property name="valign">start</property>
+                    <signal name="clicked" handler="add_call_clicked_cb" swapped="no"/>
+                    <child>
+                      <object class="GtkImage">
+                        <property name="visible">True</property>
+                        <property name="vexpand">True</property>
+                        <property name="pixel-size">32</property>
+                        <property name="icon-name">list-add-symbolic</property>
+                      </object>
+                    </child>
+                    <style>
+                      <class name="circular"/>
+                    </style>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">0</property>
+                  </packing>
+                </child>
+        	<child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="valign">start</property>
+                    <property name="vexpand">True</property>
+                    <property name="label" translatable="yes">Add call</property>
+                    <property name="justify">center</property>
+                    <property name="wrap">True</property>
+                    <property name="wrap-mode">word-char</property>
+                    <property name="max-width-chars">12</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">1</property>
+                  </packing>
+                </child>
                 <child>
                   <object class="GtkToggleButton" id="hold">
                     <property name="width-request">72</property>
@@ -252,7 +306,7 @@
                     </style>
                   </object>
                   <packing>
-                    <property name="left-attach">0</property>
+                    <property name="left-attach">1</property>
                     <property name="top-attach">0</property>
                   </packing>
                 </child>
@@ -268,7 +322,7 @@
                     <property name="max-width-chars">12</property>
                   </object>
                   <packing>
-                    <property name="left-attach">0</property>
+                    <property name="left-attach">1</property>
                     <property name="top-attach">1</property>
                   </packing>
                 </child>
@@ -294,7 +348,7 @@
                     </style>
                   </object>
                   <packing>
-                    <property name="left-attach">1</property>
+                    <property name="left-attach">2</property>
                     <property name="top-attach">0</property>
                   </packing>
                 </child>
@@ -310,23 +364,9 @@
                     <property name="max-width-chars">12</property>
                   </object>
                   <packing>
-                    <property name="left-attach">1</property>
-                    <property name="top-attach">1</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkBox" id="blank">
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="hexpand">True</property>
-                  </object>
-                  <packing>
                     <property name="left-attach">2</property>
                     <property name="top-attach">1</property>
                   </packing>
-                </child>
-                <child>
-                  <placeholder/>
                 </child>
               </object>
             </child>
@@ -464,3 +504,5 @@
     </child>
   </template>
 </interface>
+
+

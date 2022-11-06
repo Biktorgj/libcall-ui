@@ -47,6 +47,7 @@ struct _CuiCallDisplay {
 
   CuiCall                *call;
 
+  GtkLabel               *incoming_phone_call;
   HdyAvatar              *avatar;
   GtkLabel               *primary_contact_info;
   GtkLabel               *secondary_contact_info;
@@ -56,6 +57,7 @@ struct _CuiCallDisplay {
   GtkBox                 *gsm_controls;
   GtkBox                 *general_controls;
   GtkToggleButton        *speaker;
+  GtkToggleButton        *bluetooth;
   GtkToggleButton        *mute;
   GtkButton              *hang_up;
   GtkButton              *answer;
@@ -82,6 +84,17 @@ static void
 on_libcallaudio_async_finished (gboolean success, GError *error, gpointer data)
 {
   if (!success) {
+    g_return_if_fail (error && error->message);
+    g_warning ("Failed to select audio mode: %s", error->message);
+    g_error_free (error);
+  }
+}
+static void
+on_libcallaudio_bt_async_finished (gboolean success, GError *error, gpointer data)
+{
+  GtkToggleButton *togglebutton = data;
+  if (!success) {
+    gtk_toggle_button_set_active (togglebutton, FALSE);
     g_return_if_fail (error && error->message);
     g_warning ("Failed to select audio mode: %s", error->message);
     g_error_free (error);
@@ -147,6 +160,15 @@ speaker_toggled_cb (GtkToggleButton *togglebutton,
   call_audio_enable_speaker_async (want_speaker, on_libcallaudio_async_finished, NULL);
 }
 
+static void
+bluetooth_audio_toggled_cb (GtkToggleButton *togglebutton,
+                    CuiCallDisplay  *self)
+{
+  gboolean want_bluetooth;
+
+  want_bluetooth = gtk_toggle_button_get_active (togglebutton);
+  call_audio_bt_audio_async (want_bluetooth, on_libcallaudio_bt_async_finished, togglebutton);
+}
 
 static void
 add_call_clicked_cb (GtkButton      *button,
@@ -221,13 +243,18 @@ on_call_state_changed (CuiCallDisplay *self,
   gtk_widget_set_sensitive (GTK_WIDGET (self->answer), TRUE);
   gtk_widget_set_sensitive (GTK_WIDGET (self->hang_up), TRUE);
 
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
   /* Widgets and call audio mode*/
   switch (state)
   {
   case CUI_CALL_STATE_INCOMING:
     hdy_avatar_set_size (self->avatar, HDY_AVATAR_SIZE_BIG);
+    G_GNUC_FALLTHROUGH;
 
+  case CUI_CALL_STATE_WAITING: /* Deprecated */
     gtk_widget_hide (GTK_WIDGET (self->controls));
+    gtk_widget_show (GTK_WIDGET (self->incoming_phone_call));
     gtk_widget_show (GTK_WIDGET (self->answer));
     gtk_style_context_remove_class
       (hang_up_style, GTK_STYLE_CLASS_DESTRUCTIVE_ACTION);
@@ -238,10 +265,12 @@ on_call_state_changed (CuiCallDisplay *self,
     G_GNUC_FALLTHROUGH;
 
   case CUI_CALL_STATE_CALLING:
+  case CUI_CALL_STATE_ALERTING: /* Deprecated */
   case CUI_CALL_STATE_HELD:
     gtk_style_context_add_class
       (hang_up_style, GTK_STYLE_CLASS_DESTRUCTIVE_ACTION);
     gtk_widget_hide (GTK_WIDGET (self->answer));
+    gtk_widget_hide (GTK_WIDGET (self->incoming_phone_call));
     gtk_widget_show (GTK_WIDGET (self->controls));
 
     gtk_widget_set_visible
@@ -272,12 +301,16 @@ on_call_state_changed (CuiCallDisplay *self,
   /* Status text */
   switch (state)
   {
+  case CUI_CALL_STATE_INCOMING:
+  case CUI_CALL_STATE_WAITING: /* Deprecated */
+    break;
+
   case CUI_CALL_STATE_ACTIVE:
     set_pretty_time (self);
     break;
 
-  case CUI_CALL_STATE_INCOMING:
   case CUI_CALL_STATE_CALLING:
+  case CUI_CALL_STATE_ALERTING: /* Deprecated */
   case CUI_CALL_STATE_HELD:
   case CUI_CALL_STATE_DISCONNECTED:
     gtk_label_set_label (self->status, cui_call_state_to_string (state));
@@ -287,6 +320,8 @@ on_call_state_changed (CuiCallDisplay *self,
   default:
     g_warn_if_reached ();
   }
+
+  #pragma GCC diagnostic warning "-Wdeprecated-declarations"
 }
 
 
@@ -373,6 +408,7 @@ reset_ui (CuiCallDisplay *self)
   gtk_label_set_label (self->status, "");
   gtk_widget_show (GTK_WIDGET (self->answer));
   gtk_widget_show (GTK_WIDGET (self->hang_up));
+  gtk_widget_hide (GTK_WIDGET (self->incoming_phone_call));
   gtk_widget_show (GTK_WIDGET (self->controls));
   gtk_widget_show (GTK_WIDGET (self->gsm_controls));
   gtk_widget_set_sensitive (GTK_WIDGET (self->answer), TRUE);
@@ -528,11 +564,13 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, general_controls);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, gsm_controls);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, hang_up);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, incoming_phone_call);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, keypad_entry);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, mute);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, primary_contact_info);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, secondary_contact_info);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, speaker);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, bluetooth);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, status);
   gtk_widget_class_bind_template_callback (widget_class, add_call_clicked_cb);
   gtk_widget_class_bind_template_callback (widget_class, block_delete_cb);
@@ -543,7 +581,7 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_callback (widget_class, on_answer_clicked);
   gtk_widget_class_bind_template_callback (widget_class, on_hang_up_clicked);
   gtk_widget_class_bind_template_callback (widget_class, speaker_toggled_cb);
-
+  gtk_widget_class_bind_template_callback (widget_class, bluetooth_audio_toggled_cb);
   gtk_widget_class_set_css_name (widget_class, "cui-call-display");
 }
 
