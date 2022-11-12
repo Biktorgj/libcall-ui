@@ -303,14 +303,18 @@ cui_call_send_dtmf (CuiCall *self, const gchar *dtmf)
 const char *
 cui_call_state_to_string (CuiCallState state)
 {
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
   switch (state) {
   case CUI_CALL_STATE_ACTIVE:
     return _("Call active");
   case CUI_CALL_STATE_HELD:
     return _("Call held");
   case CUI_CALL_STATE_CALLING:
+  case CUI_CALL_STATE_ALERTING: /* Deprecated */
     return _("Calling…");
   case CUI_CALL_STATE_INCOMING:
+  case CUI_CALL_STATE_WAITING: /* Deprecated */
     return _("Incoming call");
   case CUI_CALL_STATE_DISCONNECTED:
     return _("Call ended");
@@ -318,4 +322,6 @@ cui_call_state_to_string (CuiCallState state)
   default:
     return _("Unknown");
   }
+
+  #pragma GCC diagnostic warning "-Wdeprecated-declarations"
 }

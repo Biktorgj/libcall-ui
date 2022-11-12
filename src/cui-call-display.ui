@@ -11,6 +11,7 @@
         <property name="width-request">300</property>
         <property name="visible">True</property>
         <property name="sensitive" bind-source="dial_pad_revealer" bind-property="reveal-child" bind-flags="bidirectional|sync-create|invert-boolean">False</property>
+        <property name="sensitive" bind-source="output_device_selector_revealer" bind-property="reveal-child" bind-flags="bidirectional|sync-create|invert-boolean">False</property>
         <property name="halign">center</property>
         <property name="margin-start">24</property>
         <property name="margin-end">24</property>
@@ -20,18 +21,6 @@
         <property name="valign">center</property>
         <property name="orientation">vertical</property>
         <property name="spacing">24</property>
-        <child>
-          <object class="GtkLabel" id="incoming_phone_call">
-            <property name="visible">False</property>
-            <property name="margin-top">12</property>
-            <property name="margin-bottom">12</property>
-            <property name="label" translatable="yes">Incoming phone call</property>
-            <property name="ellipsize">middle</property>
-            <style>
-              <class name="dim-label"/>
-            </style>
-          </object>
-        </child>
         <child>
           <object class="GtkBox" id="call_info">
             <property name="visible">True</property>
@@ -134,20 +123,21 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkToggleButton" id="speaker">
+                  <object class="GtkToggleButton" id="output_device">
                     <property name="width-request">72</property>
                     <property name="height-request">72</property>
                     <property name="visible">True</property>
                     <property name="receives-default">False</property>
                     <property name="halign">center</property>
                     <property name="valign">start</property>
-                    <signal name="toggled" handler="speaker_toggled_cb" swapped="no"/>
+                    <signal name="toggled" handler="audio_output_pressed_cb" swapped="no"/>
+
                     <child>
-                      <object class="GtkImage">
+                      <object class="GtkImage" id="output_device_icon">
                         <property name="visible">True</property>
                         <property name="vexpand">True</property>
                         <property name="pixel-size">32</property>
-                        <property name="icon-name">audio-speakers-symbolic</property>
+                        <property name="icon-name">call-start-symbolic</property>
                       </object>
                     </child>
                     <style>
@@ -160,20 +150,21 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkToggleButton" id="bluetooth">
+                  <object class="GtkButton" id="add_call">
                     <property name="width-request">72</property>
                     <property name="height-request">72</property>
                     <property name="visible">True</property>
+                    <property name="sensitive">False</property>
                     <property name="receives-default">False</property>
                     <property name="halign">center</property>
                     <property name="valign">start</property>
-                    <signal name="toggled" handler="bluetooth_audio_toggled_cb" swapped="no"/>
+                    <signal name="clicked" handler="add_call_clicked_cb" swapped="no"/>
                     <child>
                       <object class="GtkImage">
                         <property name="visible">True</property>
                         <property name="vexpand">True</property>
                         <property name="pixel-size">32</property>
-                        <property name="icon-name">bluetooth-active-symbolic</property>
+                        <property name="icon-name">list-add-symbolic</property>
                       </object>
                     </child>
                     <style>
@@ -206,7 +197,7 @@
                     <property name="visible">True</property>
                     <property name="valign">start</property>
                     <property name="vexpand">True</property>
-                    <property name="label" translatable="yes">Speaker</property>
+                    <property name="label" translatable="yes">Audio Output</property>
                     <property name="justify">center</property>
                     <property name="wrap">True</property>
                     <property name="wrap-mode">word-char</property>
@@ -217,12 +208,12 @@
                     <property name="top-attach">1</property>
                   </packing>
                 </child>
-                 <child>
+                <child>
                   <object class="GtkLabel">
                     <property name="visible">True</property>
                     <property name="valign">start</property>
                     <property name="vexpand">True</property>
-                    <property name="label" translatable="yes">Bluetooth</property>
+                    <property name="label" translatable="yes">Add call</property>
                     <property name="justify">center</property>
                     <property name="wrap">True</property>
                     <property name="wrap-mode">word-char</property>
@@ -240,49 +231,6 @@
                 <property name="visible">True</property>
                 <property name="row-spacing">6</property>
                 <property name="column-homogeneous">True</property>
-                                 <child>
-                  <object class="GtkButton" id="add_call">
-                    <property name="width-request">72</property>
-                    <property name="height-request">72</property>
-                    <property name="visible">True</property>
-                    <property name="sensitive">False</property>
-                    <property name="receives-default">False</property>
-                    <property name="halign">center</property>
-                    <property name="valign">start</property>
-                    <signal name="clicked" handler="add_call_clicked_cb" swapped="no"/>
-                    <child>
-                      <object class="GtkImage">
-                        <property name="visible">True</property>
-                        <property name="vexpand">True</property>
-                        <property name="pixel-size">32</property>
-                        <property name="icon-name">list-add-symbolic</property>
-                      </object>
-                    </child>
-                    <style>
-                      <class name="circular"/>
-                    </style>
-                  </object>
-                  <packing>
-                    <property name="left-attach">0</property>
-                    <property name="top-attach">0</property>
-                  </packing>
-                </child>
-        	<child>
-                  <object class="GtkLabel">
-                    <property name="visible">True</property>
-                    <property name="valign">start</property>
-                    <property name="vexpand">True</property>
-                    <property name="label" translatable="yes">Add call</property>
-                    <property name="justify">center</property>
-                    <property name="wrap">True</property>
-                    <property name="wrap-mode">word-char</property>
-                    <property name="max-width-chars">12</property>
-                  </object>
-                  <packing>
-                    <property name="left-attach">0</property>
-                    <property name="top-attach">1</property>
-                  </packing>
-                </child>
                 <child>
                   <object class="GtkToggleButton" id="hold">
                     <property name="width-request">72</property>
@@ -306,7 +254,7 @@
                     </style>
                   </object>
                   <packing>
-                    <property name="left-attach">1</property>
+                    <property name="left-attach">0</property>
                     <property name="top-attach">0</property>
                   </packing>
                 </child>
@@ -322,7 +270,7 @@
                     <property name="max-width-chars">12</property>
                   </object>
                   <packing>
-                    <property name="left-attach">1</property>
+                    <property name="left-attach">0</property>
                     <property name="top-attach">1</property>
                   </packing>
                 </child>
@@ -348,7 +296,7 @@
                     </style>
                   </object>
                   <packing>
-                    <property name="left-attach">2</property>
+                    <property name="left-attach">1</property>
                     <property name="top-attach">0</property>
                   </packing>
                 </child>
@@ -364,9 +312,23 @@
                     <property name="max-width-chars">12</property>
                   </object>
                   <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkBox" id="blank">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="hexpand">True</property>
+                  </object>
+                  <packing>
                     <property name="left-attach">2</property>
                     <property name="top-attach">1</property>
                   </packing>
+                </child>
+                <child>
+                  <placeholder/>
                 </child>
               </object>
             </child>
@@ -499,10 +461,65 @@
               <class name="background"/>
             </style>
           </object>
+          <object class="GtkRevealer" id="output_device_selector_revealer">
+            <property name="visible">True</property>
+            <property name="valign">end</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">False</property>
+            <property name="transition-type">slide-up</property>
+
+            <child>
+              <object class="GtkActionBar">
+                <property name="visible">True</property>
+                <child type="center">
+                  <object class="GtkBox" id="box_output_device">
+                    <property name="width-request">300</property>
+                    <property name="visible">True</property>
+                    <property name="margin-top">8</property>
+                    <property name="margin-bottom">24</property>
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">12</property>
+                    <child>
+                      <object class="GtkButton">
+                        <property name="width-request">160</property>
+                        <property name="height-request">34</property>
+                        <property name="visible">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">start</property>
+                        <property name="relief">none</property>
+                        <property name="always-show-image">True</property>
+                        <signal name="clicked" handler="hide_output_device_selector_clicked_cb" swapped="yes"/>
+                        <child>
+                          <object class="GtkImage">
+                            <property name="visible">True</property>
+                            <property name="pixel-size">24</property>
+                            <property name="icon-name">go-down-symbolic</property>
+                          </object>
+                        </child>
+                        <style>
+                          <class name="circular"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkGrid" id="output_device_selector">
+                        <property name="visible">True</property>
+                        <property name="row-spacing">6</property>
+                        <property name="column-homogeneous">True</property>
+
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <style>
+                  <class name="background"/>
+                </style>
+              </object>
+            </child>
+          </object>
         </child>
       </object>
     </child>
   </template>
 </interface>
-
-

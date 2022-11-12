@@ -26,7 +26,6 @@
 
 #define HDY_AVATAR_SIZE_BIG 160
 #define HDY_AVATAR_SIZE_DEFAULT 80
-
 /**
  * CuiCallDisplay:
  *
@@ -47,7 +46,6 @@ struct _CuiCallDisplay {
 
   CuiCall                *call;
 
-  GtkLabel               *incoming_phone_call;
   HdyAvatar              *avatar;
   GtkLabel               *primary_contact_info;
   GtkLabel               *secondary_contact_info;
@@ -56,8 +54,10 @@ struct _CuiCallDisplay {
   GtkBox                 *controls;
   GtkBox                 *gsm_controls;
   GtkBox                 *general_controls;
-  GtkToggleButton        *speaker;
-  GtkToggleButton        *bluetooth;
+  GtkButton              *output_device;
+  GtkImage               *output_device_icon;
+  GtkRevealer            *output_device_selector_revealer;
+  GtkGrid                *output_device_selector;
   GtkToggleButton        *mute;
   GtkButton              *hang_up;
   GtkButton              *answer;
@@ -74,6 +74,7 @@ struct _CuiCallDisplay {
 
   gboolean                needs_cam_reset; /* cam = Call Audio Mode */
   gboolean                update_status_time;
+  GVariant                *available_devices;
 };
 
 G_DEFINE_TYPE (CuiCallDisplay, cui_call_display, GTK_TYPE_OVERLAY);
@@ -89,18 +90,6 @@ on_libcallaudio_async_finished (gboolean success, GError *error, gpointer data)
     g_error_free (error);
   }
 }
-static void
-on_libcallaudio_bt_async_finished (gboolean success, GError *error, gpointer data)
-{
-  GtkToggleButton *togglebutton = data;
-  if (!success) {
-    gtk_toggle_button_set_active (togglebutton, FALSE);
-    g_return_if_fail (error && error->message);
-    g_warning ("Failed to select audio mode: %s", error->message);
-    g_error_free (error);
-  }
-}
-
 
 static void
 on_answer_clicked (CuiCallDisplay *self)
@@ -150,24 +139,142 @@ mute_toggled_cb (GtkToggleButton *togglebutton,
 }
 
 
-static void
-speaker_toggled_cb (GtkToggleButton *togglebutton,
-                    CuiCallDisplay  *self)
-{
-  gboolean want_speaker;
+/*
+ * **TESTING!**
+ *  Find all output devies and render a list in callui
+ *
+ *
+ */
+// This has to be removed
+guint device;
 
-  want_speaker = gtk_toggle_button_get_active (togglebutton);
-  call_audio_enable_speaker_async (want_speaker, on_libcallaudio_async_finished, NULL);
+/* Icons */
+static const char * const output_device_name[] = {
+  "call-start-symbolic",
+  "audio-headset-symbolic",
+  "audio-speakers-symbolic",
+  "audio-headphones-symbolic",
+  "bluetooth-symbolic",
+  "audio-card-usb-symbolic",
+  "dialog-warning-symbolic"
+};
+
+/**
+ * get_output_device_icon_symbolic_name:
+ * @device_type: ID of the audio device type
+ *
+ * Returns: (transfer null): The icon symbolic name to use in the output button and list
+ */
+
+const char *
+get_output_device_icon_symbolic_name (guint device_type)
+{
+  if (device_type > 5)
+    device_type = 6;
+
+  return output_device_name[device_type];
 }
 
 static void
-bluetooth_audio_toggled_cb (GtkToggleButton *togglebutton,
+request_new_audio_output_device(GtkButton *button, gpointer user_data) {
+  guint variant_pos = GPOINTER_TO_UINT (user_data);
+  
+  guint device_id = variant_pos >> 4;
+  guint device_verb =  variant_pos & 0x0f;
+
+
+  g_critical("%s DEVID: %i VERB: %i", __func__, device_id, device_verb);
+  call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
+}
+
+static GtkWidget*
+create_output_button(AudioOutputParams *DeviceParams) {
+  GtkWidget *button;
+	GtkStyleContext *context;
+  guint dev_icon = DeviceParams->device_type;
+  guint uid = 0;
+  if (DeviceParams->device_type == 0) // We only want bluetooth or USB icons for external devices... or do we?
+    dev_icon = DeviceParams->device_verb;
+  else if (DeviceParams->device_type == 1)
+    dev_icon = 4;
+  else if (DeviceParams->device_type == 2)
+    dev_icon = 5;
+  
+  g_critical("%s DEVID: %i VERB: %i", __func__, DeviceParams->device_id, DeviceParams->device_verb);
+
+  button = gtk_button_new_from_icon_name(get_output_device_icon_symbolic_name (dev_icon), GTK_ICON_SIZE_MENU);// (text);
+ 	context = gtk_widget_get_style_context (button);
+	gtk_style_context_add_class (context, "circular");
+  gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
+  gtk_button_set_label(GTK_BUTTON(button), DeviceParams->device_name);
+  gtk_button_set_always_show_image(GTK_BUTTON(button), TRUE);
+  gtk_widget_show(button);
+
+  uid = (DeviceParams->device_id << 4) + DeviceParams->device_verb;
+  g_signal_connect (button,
+                            "clicked",
+                            G_CALLBACK (request_new_audio_output_device),
+                            GUINT_TO_POINTER(uid));
+  return button;
+}
+
+static void
+audio_output_pressed_cb (GtkButton *togglebutton,
                     CuiCallDisplay  *self)
 {
-  gboolean want_bluetooth;
+  AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
+  GVariantIter *iter;
+  guint posx = 0;
+  guint posy = 0;
+  // We bounce back the button...
+ // call_audio_output_device_async (0,0, "no", on_libcallaudio_select_audio_device_finished, self);
+ // g_message("Calling call_audio_get_available_devices");
+  self->available_devices = call_audio_get_available_devices();
+  if (!self->available_devices) {
+    g_critical("No outputs available");
+    gtk_image_set_from_icon_name (self->output_device_icon,
+                              "dialog-warning-symbolic",
+                              GTK_ICON_SIZE_MENU);
+    return;
+  }
+  if (g_variant_n_children(self->available_devices) < 3) {
+    while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
+    {
+      if (!DeviceParams->is_active) {
+        call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
+        gtk_image_set_from_icon_name (self->output_device_icon,
+                                      get_output_device_icon_symbolic_name(DeviceParams->device_verb),
+                                      GTK_ICON_SIZE_MENU);
+          return;
+        }
+      }
+  g_variant_iter_free (iter);
+    if (device == 0) {
+      device = 1;
+    } else {
+      device = 0;
+    }
+    gtk_image_set_from_icon_name (self->output_device_icon,
+                                get_output_device_icon_symbolic_name(device),
+                                GTK_ICON_SIZE_MENU);
 
-  want_bluetooth = gtk_toggle_button_get_active (togglebutton);
-  call_audio_bt_audio_async (want_bluetooth, on_libcallaudio_bt_async_finished, togglebutton);
+  } else {
+    gtk_revealer_set_reveal_child (self->output_device_selector_revealer, TRUE);
+    g_variant_get (self->available_devices, "a(buuus)", &iter);
+    while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
+    {
+        gtk_grid_attach (GTK_GRID (self->output_device_selector), create_output_button(DeviceParams), posx, posy, 1, 1);
+        posy++;
+        if (posx > 2) {
+          posx = 0;
+          posy++;
+        }
+      }
+  g_variant_iter_free (iter);
+  gtk_image_set_from_icon_name (self->output_device_icon,
+                                get_output_device_icon_symbolic_name(device),
+                                GTK_ICON_SIZE_MENU);
+  }
 }
 
 static void
@@ -183,6 +290,11 @@ hide_dial_pad_clicked_cb (CuiCallDisplay *self)
   gtk_revealer_set_reveal_child (self->dial_pad_revealer, FALSE);
 }
 
+static void
+hide_output_device_selector_clicked_cb (CuiCallDisplay *self)
+{
+  gtk_revealer_set_reveal_child (self->output_device_selector_revealer, FALSE);
+}
 
 static void
 set_pretty_time (CuiCallDisplay *self)
@@ -254,7 +366,6 @@ on_call_state_changed (CuiCallDisplay *self,
 
   case CUI_CALL_STATE_WAITING: /* Deprecated */
     gtk_widget_hide (GTK_WIDGET (self->controls));
-    gtk_widget_show (GTK_WIDGET (self->incoming_phone_call));
     gtk_widget_show (GTK_WIDGET (self->answer));
     gtk_style_context_remove_class
       (hang_up_style, GTK_STYLE_CLASS_DESTRUCTIVE_ACTION);
@@ -270,7 +381,6 @@ on_call_state_changed (CuiCallDisplay *self,
     gtk_style_context_add_class
       (hang_up_style, GTK_STYLE_CLASS_DESTRUCTIVE_ACTION);
     gtk_widget_hide (GTK_WIDGET (self->answer));
-    gtk_widget_hide (GTK_WIDGET (self->incoming_phone_call));
     gtk_widget_show (GTK_WIDGET (self->controls));
 
     gtk_widget_set_visible
@@ -281,6 +391,11 @@ on_call_state_changed (CuiCallDisplay *self,
     call_audio_select_mode_async (CALL_AUDIO_MODE_CALL,
                                   on_libcallaudio_async_finished,
                                   NULL);
+    /*
+        call_audio_select_mode_async (CALL_AUDIO_MODE_SIP,
+                                  on_libcallaudio_async_finished,
+                                  NULL);
+              */                                  
     self->needs_cam_reset = TRUE;
     break;
 
@@ -390,7 +505,15 @@ on_dialpad_revealed (CuiCallDisplay *self)
   if (gtk_revealer_get_child_revealed (self->dial_pad_revealer))
     gtk_widget_grab_focus (GTK_WIDGET (self->keypad_entry));
 }
+static void
+on_output_device_selector_revealed (CuiCallDisplay *self)
+{
+  g_assert (CUI_IS_CALL_DISPLAY (self));
 
+  if (gtk_revealer_get_child_revealed (self->output_device_selector_revealer))
+    g_message("Revealing the output device selector!");
+    // gtk_widget_grab_focus (GTK_WIDGET (self->keypad_entry));
+}
 
 static void
 reset_ui (CuiCallDisplay *self)
@@ -408,7 +531,6 @@ reset_ui (CuiCallDisplay *self)
   gtk_label_set_label (self->status, "");
   gtk_widget_show (GTK_WIDGET (self->answer));
   gtk_widget_show (GTK_WIDGET (self->hang_up));
-  gtk_widget_hide (GTK_WIDGET (self->incoming_phone_call));
   gtk_widget_show (GTK_WIDGET (self->controls));
   gtk_widget_show (GTK_WIDGET (self->gsm_controls));
   gtk_widget_set_sensitive (GTK_WIDGET (self->answer), TRUE);
@@ -480,6 +602,10 @@ cui_call_display_constructed (GObject *object)
   g_signal_connect_swapped (self->dial_pad_revealer,
                             "notify::child-revealed",
                             G_CALLBACK (on_dialpad_revealed),
+                            self);
+  g_signal_connect_swapped (self->output_device_selector_revealer,
+                            "notify::child-revealed",
+                            G_CALLBACK (on_output_device_selector_revealed),
                             self);
 }
 
@@ -564,13 +690,14 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, general_controls);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, gsm_controls);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, hang_up);
-  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, incoming_phone_call);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, keypad_entry);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, mute);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, primary_contact_info);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, secondary_contact_info);
-  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, speaker);
-  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, bluetooth);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_icon);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_selector);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_selector_revealer);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, status);
   gtk_widget_class_bind_template_callback (widget_class, add_call_clicked_cb);
   gtk_widget_class_bind_template_callback (widget_class, block_delete_cb);
@@ -580,8 +707,10 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_callback (widget_class, mute_toggled_cb);
   gtk_widget_class_bind_template_callback (widget_class, on_answer_clicked);
   gtk_widget_class_bind_template_callback (widget_class, on_hang_up_clicked);
-  gtk_widget_class_bind_template_callback (widget_class, speaker_toggled_cb);
-  gtk_widget_class_bind_template_callback (widget_class, bluetooth_audio_toggled_cb);
+  gtk_widget_class_bind_template_callback (widget_class, audio_output_pressed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, hide_output_device_selector_clicked_cb);
+
+
   gtk_widget_class_set_css_name (widget_class, "cui-call-display");
 }
 
@@ -593,7 +722,6 @@ cui_call_display_init (CuiCallDisplay *self)
 
   if (!call_audio_is_inited ()) {
     g_warning ("libcallaudio not initialized");
-    gtk_widget_set_sensitive (GTK_WIDGET (self->speaker), FALSE);
     gtk_widget_set_sensitive (GTK_WIDGET (self->mute), FALSE);
   }
 }
@@ -706,3 +834,7 @@ cui_call_display_set_call (CuiCallDisplay *self, CuiCall *call)
 
   g_object_notify_by_pspec (G_OBJECT (self), props[PROP_CALL]);
 }
+
+
+
+
