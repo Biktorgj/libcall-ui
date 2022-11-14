@@ -175,13 +175,28 @@ get_output_device_icon_symbolic_name (guint device_type)
   return output_device_name[device_type];
 }
 
+/*
+static void
+on_libcallaudio_output_select_async_finished (gboolean success, GError *error, gpointer data)
+{
+  if (success) {
+      gtk_image_set_from_icon_name (self->output_device_icon,
+                                get_output_device_icon_symbolic_name(device),
+                                GTK_ICON_SIZE_MENU);
+  } else {
+    g_return_if_fail (error && error->message);
+    g_warning ("Failed to select audio mode: %s", error->message);
+    g_error_free (error);
+  }
+
+}
+*/
 static void
 request_new_audio_output_device(GtkButton *button, gpointer user_data) {
   guint variant_pos = GPOINTER_TO_UINT (user_data);
   
   guint device_id = variant_pos >> 4;
   guint device_verb =  variant_pos & 0x0f;
-
 
   g_critical("%s DEVID: %i VERB: %i", __func__, device_id, device_verb);
   call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
@@ -224,8 +239,7 @@ audio_output_pressed_cb (GtkButton *togglebutton,
 {
   AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
   GVariantIter *iter;
-  guint posx = 0;
-  guint posy = 0;
+  guint pos = 0;
   // We bounce back the button...
  // call_audio_output_device_async (0,0, "no", on_libcallaudio_select_audio_device_finished, self);
  // g_message("Calling call_audio_get_available_devices");
@@ -237,43 +251,31 @@ audio_output_pressed_cb (GtkButton *togglebutton,
                               GTK_ICON_SIZE_MENU);
     return;
   }
+
   if (g_variant_n_children(self->available_devices) < 3) {
+    g_variant_get (self->available_devices, "a(buuus)", &iter);
     while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
     {
+      g_critical("%s DEVID: %i VERB: %i, active %i", __func__, DeviceParams->device_id, DeviceParams->device_verb, DeviceParams->is_active);
+
       if (!DeviceParams->is_active) {
-        call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
+        call_audio_output_device_async (DeviceParams->device_id, DeviceParams->device_verb, on_libcallaudio_async_finished, NULL);
         gtk_image_set_from_icon_name (self->output_device_icon,
                                       get_output_device_icon_symbolic_name(DeviceParams->device_verb),
                                       GTK_ICON_SIZE_MENU);
-          return;
+          break;
         }
       }
-  g_variant_iter_free (iter);
-    if (device == 0) {
-      device = 1;
-    } else {
-      device = 0;
-    }
-    gtk_image_set_from_icon_name (self->output_device_icon,
-                                get_output_device_icon_symbolic_name(device),
-                                GTK_ICON_SIZE_MENU);
-
+    g_variant_iter_free (iter);
   } else {
     gtk_revealer_set_reveal_child (self->output_device_selector_revealer, TRUE);
     g_variant_get (self->available_devices, "a(buuus)", &iter);
     while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
     {
-        gtk_grid_attach (GTK_GRID (self->output_device_selector), create_output_button(DeviceParams), posx, posy, 1, 1);
-        posy++;
-        if (posx > 2) {
-          posx = 0;
-          posy++;
-        }
+        gtk_grid_attach (GTK_GRID (self->output_device_selector), create_output_button(DeviceParams), 0, pos, 1, 1);
+        pos++;
       }
-  g_variant_iter_free (iter);
-  gtk_image_set_from_icon_name (self->output_device_icon,
-                                get_output_device_icon_symbolic_name(device),
-                                GTK_ICON_SIZE_MENU);
+    g_variant_iter_free (iter);
   }
 }
 

@@ -130,7 +130,7 @@
                     <property name="receives-default">False</property>
                     <property name="halign">center</property>
                     <property name="valign">start</property>
-                    <signal name="toggled" handler="audio_output_pressed_cb" swapped="no"/>
+                    <signal name="released" handler="audio_output_pressed_cb" swapped="no"/>
 
                     <child>
                       <object class="GtkImage" id="output_device_icon">
