@@ -75,6 +75,7 @@ struct _CuiCallDisplay {
   gboolean                needs_cam_reset; /* cam = Call Audio Mode */
   gboolean                update_status_time;
   GVariant                *available_devices;
+  guint                   protocol;
 };
 
 G_DEFINE_TYPE (CuiCallDisplay, cui_call_display, GTK_TYPE_OVERLAY);
@@ -233,6 +234,35 @@ create_output_button(AudioOutputParams *DeviceParams) {
   return button;
 }
 
+static void 
+update_callaudio_icon(CuiCallDisplay *self) {
+
+  AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
+  GVariantIter *iter;
+  guint pos = 0;
+  self->available_devices = call_audio_get_available_devices();
+  if (!self->available_devices) {
+    g_critical("No outputs available");
+    gtk_image_set_from_icon_name (self->output_device_icon,
+                              "dialog-warning-symbolic",
+                              GTK_ICON_SIZE_MENU);
+    return;
+  }
+
+  if (g_variant_n_children(self->available_devices) > 0 ) {
+    g_variant_get (self->available_devices, "a(buuus)", &iter);
+    while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
+    {
+      if (!DeviceParams->is_active) {
+        gtk_image_set_from_icon_name (self->output_device_icon,
+                                      get_output_device_icon_symbolic_name(DeviceParams->device_verb),
+                                      GTK_ICON_SIZE_MENU);
+          break;
+        }
+      }
+    g_variant_iter_free (iter);
+  }
+}
 static void
 audio_output_pressed_cb (GtkButton *togglebutton,
                     CuiCallDisplay  *self)
@@ -240,9 +270,7 @@ audio_output_pressed_cb (GtkButton *togglebutton,
   AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
   GVariantIter *iter;
   guint pos = 0;
-  // We bounce back the button...
- // call_audio_output_device_async (0,0, "no", on_libcallaudio_select_audio_device_finished, self);
- // g_message("Calling call_audio_get_available_devices");
+
   self->available_devices = call_audio_get_available_devices();
   if (!self->available_devices) {
     g_critical("No outputs available");
@@ -388,16 +416,21 @@ on_call_state_changed (CuiCallDisplay *self,
     gtk_widget_set_visible
       (GTK_WIDGET (self->gsm_controls),
       state != CUI_CALL_STATE_CALLING);
-
-    /* TODO Only switch to "call" audio mode for cellular calls */
-    call_audio_select_mode_async (CALL_AUDIO_MODE_CALL,
-                                  on_libcallaudio_async_finished,
-                                  NULL);
-    /*
+    
+    if (self->protocol == 2) {
+      g_message("Call protocol is SIP, setting HiFi mode...");
         call_audio_select_mode_async (CALL_AUDIO_MODE_SIP,
                                   on_libcallaudio_async_finished,
                                   NULL);
-              */                                  
+    } else if (self->protocol == 1) {
+      g_message("Call protocol is telephone, setting VoiceCall mode...");
+      call_audio_select_mode_async (CALL_AUDIO_MODE_CALL,
+                                    on_libcallaudio_async_finished,
+                                    NULL);
+
+    } else {
+      g_message("Unknown call protocol, not starting call audio yet");
+    }
     self->needs_cam_reset = TRUE;
     break;
 
@@ -495,9 +528,30 @@ on_time_updated (CuiCallDisplay *self)
   if (!self->update_status_time)
     return;
 
+  // Should subscribe to dbus events...
+  update_callaudio_icon(self);
   set_pretty_time (self);
 }
 
+static void
+on_update_call_protocol (CuiCallDisplay *self)
+{
+  CuiCallState state;
+  const char *number;
+  g_assert (CUI_IS_CALL_DISPLAY (self));
+  g_assert (CUI_IS_CALL (self->call));
+
+  number = cui_call_get_id (self->call);
+  if (IS_NULL_OR_EMPTY (number))
+    number = _("Unknown");
+  if (strstr(number, "sip")) {
+    g_critical("Call in SIP mode");
+    self->protocol = 2;
+  } else {
+    g_critical("Normal call, or unknown, falling back to voice call mode ");
+    self->protocol = 1;
+  }
+}
 
 static void
 on_dialpad_revealed (CuiCallDisplay *self)
@@ -817,6 +871,13 @@ cui_call_display_set_call (CuiCallDisplay *self, CuiCall *call)
                            self,
                            G_CONNECT_SWAPPED);
 
+  g_signal_connect_object (call, "Protocol", 
+                           G_CALLBACK (on_update_call_protocol),
+                           self,
+                           G_CONNECT_SWAPPED);
+  on_update_call_protocol(self);
+
+  on_update_contact_information (self);
   self->dtmf_bind = g_object_bind_property (call,
                                             "can-dtmf",
                                             self->dial_pad,
