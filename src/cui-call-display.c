@@ -56,6 +56,7 @@ struct _CuiCallDisplay {
   GtkBox                 *general_controls;
   GtkButton              *output_device;
   GtkImage               *output_device_icon;
+  GtkLabel               *output_device_label;
   GtkRevealer            *output_device_selector_revealer;
   GtkGrid                *output_device_selector;
   GtkToggleButton        *mute;
@@ -176,29 +177,12 @@ get_output_device_icon_symbolic_name (guint device_type)
   return output_device_name[device_type];
 }
 
-/*
-static void
-on_libcallaudio_output_select_async_finished (gboolean success, GError *error, gpointer data)
-{
-  if (success) {
-      gtk_image_set_from_icon_name (self->output_device_icon,
-                                get_output_device_icon_symbolic_name(device),
-                                GTK_ICON_SIZE_MENU);
-  } else {
-    g_return_if_fail (error && error->message);
-    g_warning ("Failed to select audio mode: %s", error->message);
-    g_error_free (error);
-  }
-
-}
-*/
 static void
 request_new_audio_output_device(GtkButton *button, gpointer user_data) {
   guint variant_pos = GPOINTER_TO_UINT (user_data);
   
   guint device_id = variant_pos >> 4;
   guint device_verb =  variant_pos & 0x0f;
-
   g_critical("%s DEVID: %i VERB: %i", __func__, device_id, device_verb);
   call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
 }
@@ -239,8 +223,8 @@ update_callaudio_icon(CuiCallDisplay *self) {
 
   AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
   GVariantIter *iter;
-  guint pos = 0;
   self->available_devices = call_audio_get_available_devices();
+
   if (!self->available_devices) {
     g_critical("No outputs available");
     gtk_image_set_from_icon_name (self->output_device_icon,
@@ -253,16 +237,19 @@ update_callaudio_icon(CuiCallDisplay *self) {
     g_variant_get (self->available_devices, "a(buuus)", &iter);
     while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
     {
-      if (!DeviceParams->is_active) {
+      if (DeviceParams->is_active) {
         gtk_image_set_from_icon_name (self->output_device_icon,
                                       get_output_device_icon_symbolic_name(DeviceParams->device_verb),
                                       GTK_ICON_SIZE_MENU);
+        gtk_label_set_label (self->output_device_label,  DeviceParams->device_name);
+
           break;
         }
       }
     g_variant_iter_free (iter);
   }
 }
+
 static void
 audio_output_pressed_cb (GtkButton *togglebutton,
                     CuiCallDisplay  *self)
@@ -291,6 +278,7 @@ audio_output_pressed_cb (GtkButton *togglebutton,
         gtk_image_set_from_icon_name (self->output_device_icon,
                                       get_output_device_icon_symbolic_name(DeviceParams->device_verb),
                                       GTK_ICON_SIZE_MENU);
+
           break;
         }
       }
@@ -422,14 +410,12 @@ on_call_state_changed (CuiCallDisplay *self,
         call_audio_select_mode_async (CALL_AUDIO_MODE_SIP,
                                   on_libcallaudio_async_finished,
                                   NULL);
-    } else if (self->protocol == 1) {
+    } else {
       g_message("Call protocol is telephone, setting VoiceCall mode...");
       call_audio_select_mode_async (CALL_AUDIO_MODE_CALL,
                                     on_libcallaudio_async_finished,
                                     NULL);
 
-    } else {
-      g_message("Unknown call protocol, not starting call audio yet");
     }
     self->needs_cam_reset = TRUE;
     break;
@@ -536,7 +522,6 @@ on_time_updated (CuiCallDisplay *self)
 static void
 on_update_call_protocol (CuiCallDisplay *self)
 {
-  CuiCallState state;
   const char *number;
   g_assert (CUI_IS_CALL_DISPLAY (self));
   g_assert (CUI_IS_CALL (self->call));
@@ -752,6 +737,7 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, secondary_contact_info);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_icon);
+  gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_label);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_selector);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, output_device_selector_revealer);
   gtk_widget_class_bind_template_child (widget_class, CuiCallDisplay, status);

@@ -11,7 +11,6 @@
         <property name="width-request">300</property>
         <property name="visible">True</property>
         <property name="sensitive" bind-source="dial_pad_revealer" bind-property="reveal-child" bind-flags="bidirectional|sync-create|invert-boolean">False</property>
-        <property name="sensitive" bind-source="output_device_selector_revealer" bind-property="reveal-child" bind-flags="bidirectional|sync-create|invert-boolean">False</property>
         <property name="halign">center</property>
         <property name="margin-start">24</property>
         <property name="margin-end">24</property>
@@ -193,11 +192,12 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel">
+                  <object class="GtkLabel" id="output_device_label">
+                    <property name="name">cui_call_display_output_device_label</property>
                     <property name="visible">True</property>
                     <property name="valign">start</property>
                     <property name="vexpand">True</property>
-                    <property name="label" translatable="yes">Audio Output</property>
+                    <property name="label"> Output device</property>
                     <property name="justify">center</property>
                     <property name="wrap">True</property>
                     <property name="wrap-mode">word-char</property>
@@ -461,62 +461,63 @@
               <class name="background"/>
             </style>
           </object>
-          <object class="GtkRevealer" id="output_device_selector_revealer">
+        </child>
+      </object>
+    </child>
+    <child type="overlay">
+      <object class="GtkRevealer" id="output_device_selector_revealer">
+        <property name="visible">True</property>
+        <property name="valign">end</property>
+        <property name="hexpand">True</property>
+        <property name="vexpand">False</property>
+        <property name="transition-type">slide-up</property>
+        <child>
+          <object class="GtkActionBar">
             <property name="visible">True</property>
-            <property name="valign">end</property>
-            <property name="hexpand">True</property>
-            <property name="vexpand">False</property>
-            <property name="transition-type">slide-up</property>
-
-            <child>
-              <object class="GtkActionBar">
+            <child type="center">
+              <object class="GtkBox" id="box_output_device">
+                <property name="width-request">300</property>
                 <property name="visible">True</property>
-                <child type="center">
-                  <object class="GtkBox" id="box_output_device">
-                    <property name="width-request">300</property>
+                <property name="margin-top">8</property>
+                <property name="margin-bottom">24</property>
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <child>
+                  <object class="GtkButton">
+                    <property name="width-request">160</property>
+                    <property name="height-request">34</property>
                     <property name="visible">True</property>
-                    <property name="margin-top">8</property>
-                    <property name="margin-bottom">24</property>
-                    <property name="orientation">vertical</property>
-                    <property name="spacing">12</property>
+                    <property name="receives-default">False</property>
+                    <property name="halign">center</property>
+                    <property name="valign">start</property>
+                    <property name="relief">none</property>
+                    <property name="always-show-image">True</property>
+                    <signal name="clicked" handler="hide_output_device_selector_clicked_cb" swapped="yes"/>
                     <child>
-                      <object class="GtkButton">
-                        <property name="width-request">160</property>
-                        <property name="height-request">34</property>
+                      <object class="GtkImage">
                         <property name="visible">True</property>
-                        <property name="receives-default">False</property>
-                        <property name="halign">center</property>
-                        <property name="valign">start</property>
-                        <property name="relief">none</property>
-                        <property name="always-show-image">True</property>
-                        <signal name="clicked" handler="hide_output_device_selector_clicked_cb" swapped="yes"/>
-                        <child>
-                          <object class="GtkImage">
-                            <property name="visible">True</property>
-                            <property name="pixel-size">24</property>
-                            <property name="icon-name">go-down-symbolic</property>
-                          </object>
-                        </child>
-                        <style>
-                          <class name="circular"/>
-                        </style>
+                        <property name="pixel-size">24</property>
+                        <property name="icon-name">go-down-symbolic</property>
                       </object>
                     </child>
-                    <child>
-                      <object class="GtkGrid" id="output_device_selector">
-                        <property name="visible">True</property>
-                        <property name="row-spacing">6</property>
-                        <property name="column-homogeneous">True</property>
-
-                      </object>
-                    </child>
+                    <style>
+                      <class name="circular"/>
+                    </style>
                   </object>
                 </child>
-                <style>
-                  <class name="background"/>
-                </style>
+                <child>
+                  <object class="GtkGrid" id="output_device_selector">
+                    <property name="visible">True</property>
+                    <property name="row-spacing">6</property>
+                    <property name="column-homogeneous">True</property>
+
+                  </object>
+                </child>
               </object>
             </child>
+            <style>
+              <class name="background"/>
+            </style>
           </object>
         </child>
       </object>
