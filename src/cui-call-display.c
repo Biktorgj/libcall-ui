@@ -54,7 +54,7 @@ struct _CuiCallDisplay {
   GtkBox                 *controls;
   GtkBox                 *gsm_controls;
   GtkBox                 *general_controls;
-  GtkButton              *output_device;
+  GtkToggleButton        *output_device;
   GtkImage               *output_device_icon;
   GtkLabel               *output_device_label;
   GtkRevealer            *output_device_selector_revealer;
@@ -251,13 +251,13 @@ update_callaudio_icon(CuiCallDisplay *self) {
 }
 
 static void
-audio_output_pressed_cb (GtkButton *togglebutton,
+audio_output_pressed_cb (GtkToggleButton *togglebutton,
                     CuiCallDisplay  *self)
 {
   AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
   GVariantIter *iter;
   guint pos = 0;
-
+  gtk_toggle_button_set_active(togglebutton, FALSE);
   self->available_devices = call_audio_get_available_devices();
   if (!self->available_devices) {
     g_critical("No outputs available");
