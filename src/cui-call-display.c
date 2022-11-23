@@ -76,7 +76,7 @@ struct _CuiCallDisplay {
   gboolean                needs_cam_reset; /* cam = Call Audio Mode */
   gboolean                update_status_time;
   GVariant                *available_devices;
-  guint                   protocol;
+  gboolean                protocol;
 };
 
 G_DEFINE_TYPE (CuiCallDisplay, cui_call_display, GTK_TYPE_OVERLAY);
@@ -157,7 +157,7 @@ static const char * const output_device_name[] = {
   "audio-speakers-symbolic",
   "audio-headphones-symbolic",
   "bluetooth-symbolic",
-  "audio-card-usb-symbolic",
+  "audio-card-symbolic",
   "dialog-warning-symbolic"
 };
 
@@ -183,7 +183,7 @@ request_new_audio_output_device(GtkButton *button, gpointer user_data) {
   
   guint device_id = variant_pos >> 4;
   guint device_verb =  variant_pos & 0x0f;
-  g_critical("%s DEVID: %i VERB: %i", __func__, device_id, device_verb);
+  g_message("Selecting %s as the output device (Device ID %i, Verb %i)", __func__, device_id, device_verb);
   call_audio_output_device_async (device_id, device_verb, on_libcallaudio_async_finished, NULL);
 }
 
@@ -191,17 +191,14 @@ static GtkWidget*
 create_output_button(AudioOutputParams *DeviceParams) {
   GtkWidget *button;
 	GtkStyleContext *context;
-  guint dev_icon = DeviceParams->device_type;
   guint uid = 0;
-  if (DeviceParams->device_type == 0) // We only want bluetooth or USB icons for external devices... or do we?
-    dev_icon = DeviceParams->device_verb;
-  else if (DeviceParams->device_type == 1)
+  guint dev_icon = DeviceParams->device_verb;
+  // We only want bluetooth or USB icons for external devices...
+  if (DeviceParams->device_type == 2)
     dev_icon = 4;
-  else if (DeviceParams->device_type == 2)
+  else if (DeviceParams->device_type > 2)
     dev_icon = 5;
   
-  g_critical("%s DEVID: %i VERB: %i", __func__, DeviceParams->device_id, DeviceParams->device_verb);
-
   button = gtk_button_new_from_icon_name(get_output_device_icon_symbolic_name (dev_icon), GTK_ICON_SIZE_MENU);// (text);
  	context = gtk_widget_get_style_context (button);
 	gtk_style_context_add_class (context, "circular");
@@ -223,13 +220,14 @@ update_callaudio_icon(CuiCallDisplay *self) {
 
   AudioOutputParams *DeviceParams = g_new0(AudioOutputParams, 1);
   GVariantIter *iter;
+  guint dev_icon;
   self->available_devices = call_audio_get_available_devices();
-
   if (!self->available_devices) {
     g_critical("No outputs available");
     gtk_image_set_from_icon_name (self->output_device_icon,
                               "dialog-warning-symbolic",
                               GTK_ICON_SIZE_MENU);
+    gtk_label_set_label (self->output_device_label, "Error in Callaudio");
     return;
   }
 
@@ -238,8 +236,14 @@ update_callaudio_icon(CuiCallDisplay *self) {
     while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
     {
       if (DeviceParams->is_active) {
+        dev_icon = DeviceParams->device_verb;
+        // We only want bluetooth or USB icons for external devices...
+        if (DeviceParams->device_type == 2)
+          dev_icon = 4;
+        else if (DeviceParams->device_type > 2)
+          dev_icon = 5;
         gtk_image_set_from_icon_name (self->output_device_icon,
-                                      get_output_device_icon_symbolic_name(DeviceParams->device_verb),
+                                      get_output_device_icon_symbolic_name(dev_icon),
                                       GTK_ICON_SIZE_MENU);
         gtk_label_set_label (self->output_device_label,  DeviceParams->device_name);
 
@@ -271,8 +275,6 @@ audio_output_pressed_cb (GtkToggleButton *togglebutton,
     g_variant_get (self->available_devices, "a(buuus)", &iter);
     while (g_variant_iter_loop (iter, "(buuus)", &DeviceParams->is_active, &DeviceParams->device_id, &DeviceParams->device_type, &DeviceParams->device_verb, &DeviceParams->device_name))
     {
-      g_critical("%s DEVID: %i VERB: %i, active %i", __func__, DeviceParams->device_id, DeviceParams->device_verb, DeviceParams->is_active);
-
       if (!DeviceParams->is_active) {
         call_audio_output_device_async (DeviceParams->device_id, DeviceParams->device_verb, on_libcallaudio_async_finished, NULL);
         gtk_image_set_from_icon_name (self->output_device_icon,
@@ -405,7 +407,7 @@ on_call_state_changed (CuiCallDisplay *self,
       (GTK_WIDGET (self->gsm_controls),
       state != CUI_CALL_STATE_CALLING);
     
-    if (self->protocol == 2) {
+    if (self->protocol) {
       g_message("Call protocol is SIP, setting HiFi mode...");
         call_audio_select_mode_async (CALL_AUDIO_MODE_SIP,
                                   on_libcallaudio_async_finished,
@@ -523,18 +525,15 @@ static void
 on_update_call_protocol (CuiCallDisplay *self)
 {
   const char *number;
+
   g_assert (CUI_IS_CALL_DISPLAY (self));
   g_assert (CUI_IS_CALL (self->call));
-
   number = cui_call_get_id (self->call);
   if (IS_NULL_OR_EMPTY (number))
-    number = _("Unknown");
+    return;
+
   if (strstr(number, "sip")) {
-    g_critical("Call in SIP mode");
-    self->protocol = 2;
-  } else {
-    g_critical("Normal call, or unknown, falling back to voice call mode ");
-    self->protocol = 1;
+    self->protocol = TRUE;
   }
 }
 
@@ -752,7 +751,6 @@ cui_call_display_class_init (CuiCallDisplayClass *klass)
   gtk_widget_class_bind_template_callback (widget_class, audio_output_pressed_cb);
   gtk_widget_class_bind_template_callback (widget_class, hide_output_device_selector_clicked_cb);
 
-
   gtk_widget_class_set_css_name (widget_class, "cui-call-display");
 }
 
@@ -825,6 +823,7 @@ cui_call_display_set_call (CuiCallDisplay *self, CuiCall *call)
   }
 
   self->update_status_time = TRUE;
+  self->protocol = FALSE;
   self->needs_cam_reset = FALSE;
 
   self->call = call;
@@ -857,10 +856,6 @@ cui_call_display_set_call (CuiCallDisplay *self, CuiCall *call)
                            self,
                            G_CONNECT_SWAPPED);
 
-  g_signal_connect_object (call, "Protocol", 
-                           G_CALLBACK (on_update_call_protocol),
-                           self,
-                           G_CONNECT_SWAPPED);
   on_update_call_protocol(self);
 
   on_update_contact_information (self);
