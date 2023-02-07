@@ -144,11 +144,7 @@ mute_toggled_cb (GtkToggleButton *togglebutton,
 /*
  * **TESTING!**
  *  Find all output devies and render a list in callui
- *
- *
  */
-// This has to be removed
-guint device;
 
 /* Icons */
 static const char * const output_device_name[] = {
@@ -406,19 +402,19 @@ on_call_state_changed (CuiCallDisplay *self,
     gtk_widget_set_visible
       (GTK_WIDGET (self->gsm_controls),
       state != CUI_CALL_STATE_CALLING);
-    
+   /* 
     if (self->protocol) {
       g_message("Call protocol is SIP, setting HiFi mode...");
         call_audio_select_mode_async (CALL_AUDIO_MODE_SIP,
                                   on_libcallaudio_async_finished,
                                   NULL);
     } else {
+
+    }*/
       g_message("Call protocol is telephone, setting VoiceCall mode...");
       call_audio_select_mode_async (CALL_AUDIO_MODE_CALL,
                                     on_libcallaudio_async_finished,
                                     NULL);
-
-    }
     self->needs_cam_reset = TRUE;
     break;
 
